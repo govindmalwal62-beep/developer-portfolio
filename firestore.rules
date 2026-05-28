@@ -1,0 +1,88 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- REUSABLE GLOBAL HELPER FUNCTIONS ---
+    
+    // Checks that an ID is of proper type and safe length
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // Accesses incoming model properties
+    function incoming() {
+      return request.resource.data;
+    }
+
+    // Accesses existing database model properties
+    function existing() {
+      return resource.data;
+    }
+
+    // Verifies if user is authenticated
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Verifies if the user is the bootstrapped site owner/admin
+    // Rules inspect the verified Google token claims directly
+    function isAdmin() {
+      return isSignedIn() && 
+             request.auth.token.email == "govindmalwal62@gmail.com" && 
+             request.auth.token.email_verified == true;
+    }
+
+    // --- ENTITY SPECIFIC SCHEMAS & VALIDATION ---
+
+    // Contact messages schema validation
+    function isValidMessage(data) {
+      return data.keys().hasAll(['name', 'email', 'subject', 'message', 'createdAt']) &&
+             data.keys().size() == 5 &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 150 &&
+             data.email is string && data.email.size() > 0 && data.email.size() <= 250 &&
+             data.subject is string && data.subject.size() > 0 && data.subject.size() <= 250 &&
+             data.message is string && data.message.size() > 0 && data.message.size() <= 5000 &&
+             data.createdAt == request.time;
+    }
+
+    // Portfolio projects schema validation
+    function isValidProject(data) {
+      return data.keys().hasAll(['title', 'description', 'category', 'techStack', 'createdAt']) &&
+             data.keys().size() <= 8 &&
+             data.title is string && data.title.size() > 0 && data.title.size() <= 200 &&
+             data.description is string && data.description.size() > 0 && data.description.size() <= 2000 &&
+             data.category is string && (
+               data.category == 'AI' || 
+               data.category == 'Web Apps' || 
+               data.category == 'Games' || 
+               data.category == 'College Projects'
+             ) &&
+             data.techStack is list && data.techStack.size() >= 1 && data.techStack.size() <= 20 &&
+             (!data.keys().hasAny(['image']) || (data.image is string && data.image.size() <= 2048)) &&
+             (!data.keys().hasAny(['liveUrl']) || (data.liveUrl is string && data.liveUrl.size() <= 2048)) &&
+             (!data.keys().hasAny(['githubUrl']) || (data.githubUrl is string && data.githubUrl.size() <= 2048));
+    }
+
+    // --- PATH COLLECTIONS MATCHING ---
+
+    // Contact messages path
+    match /messages/{messageId} {
+      allow create: if isValidId(messageId) && isValidMessage(incoming());
+      // Admin-only operations for reading and housekeeping
+      allow read, update, delete: if isAdmin();
+    }
+
+    // Portfolio projects path
+    match /projects/{projectId} {
+      allow read: if true;
+      allow create: if isAdmin() && isValidId(projectId) && isValidProject(incoming()) && incoming().createdAt == request.time;
+      allow update: if isAdmin() && isValidId(projectId) && isValidProject(incoming());
+      allow delete: if isAdmin();
+    }
+  }
+}

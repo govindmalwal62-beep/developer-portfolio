@@ -1,0 +1,6 @@
+{
+  "name": "Developer Portfolio",
+  "description": "A premium, modern developer portfolio website featuring glassmorphism design, smooth motion animations, interactive project filter, resume preview, and a Firebase-connected contact form & administrator portal.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
